@@ -1,0 +1,134 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+install.packages("tidytuesdayR")
+install.packages("stringr")
+```
+```{r}
+
+lifetime_earn <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/lifetime_earn.csv')
+student_debt <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/student_debt.csv')
+retirement <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/retirement.csv')
+home_owner <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/home_owner.csv')
+race_wealth <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/race_wealth.csv')
+income_time <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_time.csv')
+income_limits <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_limits.csv')
+income_aggregate <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_aggregate.csv')
+income_distribution <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_distribution.csv')
+income_mean <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-02-09/income_mean.csv')
+```
+```{r}
+lifetime_earn
+student_debt
+retirement
+home_owner
+race_wealth
+income_time
+income_limits
+income_aggregate 
+income_distribution
+
+```
+
+
+```{r}
+library(ggplot2)
+library(stringr)
+ggplot(data = income_distribution,mapping = aes(year,income_median,color = race))+ geom_line()
+```
+
+
+```{r}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+income_distribution$race[income_distribution$race == "White Alone"] <- "White"
+income_distribution$race[income_distribution$race == "Black Alone"] <- "Black"
+income_distribution$race[income_distribution$race == "Hispanic (Any Race)"] <- "Hispanic"
+income_distribution
+race_wealth_retirement <- inner_join(income_distribution,retirement,by=c("year","race"))
+race_wealth_retirement
+```
+```{r}
+race_wealth_retirement <- inner_join(income_distribution,retirement,by=c("year","race"))
+race_wealth_retirement
+exp_ret_savings <- race_wealth_retirement %>%
+  mutate(ex_life_sav = income_mean*48*.0001)
+exp_ret_savings
+ggplot()+
+  geom_point(data = exp_ret_savings, aes( x = ex_life_sav, y = retirement, group = race, color = race))+
+  scale_y_continuous(limits = c(0, 250000), expand = c(0,0)) +
+      scale_x_continuous(limits = c(0, 500), expand = c(0,0))+
+  xlab(label = "Expected ife savings in $100,000" )+
+  ylab(label = "Real retirement savings" )
+```
+
+
+```{r}
+ggplot(race_wealth_retirement,mapping = aes(x=income_median,y = retirement))+geom_point(aes(color = race))
+```
+
+```{r}
+student_Debt_retirement <- merge(student_debt,retirement,by = c ("year","race"))
+student_Debt_retirement
+```
+```{r}
+retirement_avg <- retirement %>% group_by(race) %>% summarize(mean_retirement = mean(retirement),median_retirement= median(retirement)) %>% ungroup() 
+loandebt_avg <- student_debt %>% group_by(race) %>% summarize(mean_student_debt = mean(loan_debt)) %>% ungroup()
+wealth_avg <- race_wealth %>% group_by(race) %>% summarize(median_wealth = median(wealth_family,na.rm = TRUE)) %>% ungroup()
+retirement_avg
+loandebt_avg
+wealth_avg
+race_rtment_debt <- merge(merge(retirement_avg,loandebt_avg, by = "race"),wealth_avg, by= "race")
+race_rtment_debt
+```
+```{r}
+student_Debt_retirement <- student_Debt_retirement %>% mutate(grossfunds = retirement - loan_debt)
+student_Debt_retirement
+ggplot(student_Debt_retirement,mapping = aes(year,grossfunds,color = race)) + geom_line()
+
+```
+```{r}
+income_distribution%>% group_by(year,race)%>%mutate(sum_id = sum(income_distribution))
+
+income_distribution$income_bracket <- factor(income_distribution$income_bracket,levels = c("Under $15,000","$15,000 to $24,999","$25,000 to $34,999","$35,000 to $49,999","$50,000 to $74,999","$75,000 to $99,999","$100,000 to $149,999","$150,000 to $199,999","$200,000 and over"))
+ggplot(income_distribution,mapping=aes(x = income_bracket, y = income_distribution,group = race,fill = race)) + geom_col(position = "dodge") + coord_flip()
+```
+
+
+```{r}
+target <- c("White", "Black", "Hispanic")
+income_dist_up <- filter(income_distribution, race %in% target) %>%
+  mutate(income_mean = (income_mean/1000))
+ggplot(data=income_dist_up, aes(x=year, y=income_mean, color=race)) +
+  geom_line(aes(group=race)) +
+  labs(y = "Mean Income ($k)", x = "Year") +
+  theme_minimal()
+```
+```{r}
+exp_ret_savings <- race_wealth_retirement %>%
+  mutate(ex_life_sav = income_mean*48*.0001)%>%
+  mutate(adj_retirement = retirement*.001)
+exp_ret_savings
+ggplot()+
+  geom_point(data = exp_ret_savings, aes(x = ex_life_sav, y = adj_retirement, group = race, color = race))+
+  scale_y_continuous(limits = c(0, 200), expand = c(0,0)) +
+      scale_x_continuous(limits = c(0, 450), expand = c(0,0))+
+  xlab(label = "Expected Retirement savings ($100k)")+
+  ylab(label = "Real Retirement savings ($100k)")+
+  theme_minimal()
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
